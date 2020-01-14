@@ -170,7 +170,7 @@ function CHAT_MSG_COMBAT_HONOR_GAIN_FILTER(_s, e, msg, ...)
 	if (not victim) then
 		return
 	end
-	return false, format("%s today kills: %d, honor: |cff00FF96%d", msg, HonorSpy.db.char.today_kills[victim] or 0, est_honor), ...
+	return false, format("%s Today kills: %d, Estimated honor: |cff00FF96%d", msg, HonorSpy.db.char.today_kills[victim] or 0, est_honor), ...
 end
 
 -- INSPECT HOOKS pausing to not mess with native inspect calls
@@ -279,33 +279,118 @@ function HonorSpy:GetBrackets(pool_size)
 	if (not pool_size) then
 		return brk
 	end
+
+	if (HonorSpy.db.factionrealm.currentPlayerNumber > pool_size) then
+		pool_size = HonorSpy.db.factionrealm.currentPlayerNumber;
+	end
+	
+	if (HonorSpy.db.factionrealm.lastPlayerNumber > pool_size) then
+		pool_size = HonorSpy.db.factionrealm.lastPlayerNumber;
+	end
+
 	for i = 1,14 do
 		brk[i] = math.floor(brk[i]*pool_size+.5)
 	end
 	return brk
 end
 
-function HonorSpy:Estimate(playerOfInterest, buildStandingsTable)
+function HonorSpy:EstimateStanding(playerOfInterest)
+	local tableCurr = { }
+	local tableLast = { }
+
+	local targetHonor = 0;
+
+	for playerName, player in pairs(HonorSpy.db.factionrealm.currentStandings) do
+		if (playerOfInterest == playerName) then
+			targetHonor = player.thisWeekHonor;
+		end
+
+		table.insert(tableCurr, {playerName, player.lastWeekHonor or 0, player.standing or 0})
+	end
+	for playerName, player in pairs(HonorSpy.db.factionrealm.lastStandings) do
+		table.insert(tableLast, {playerName, player.lastWeekHonor or 0, player.standing or 0})
+	end
+
+	-- Sort
+	local sort_func_asc = function(a, b)
+		return a[2] < b[2]
+	end
+
+	table.sort(tableCurr, sort_func_asc)
+	table.sort(tableLast, sort_func_asc)
+
+	-- Target Honor
+	if (playerOfInterest == UnitName("player")) then
+		targetHonor = HonorSpy.db.char.estimated_honor;
+	end
+
+	local prevStanding = 0;
+
+	local lastEstStanding = 0;
+	local lastEstStandingDiff = 0;
+	for i = 1, #tableLast do
+		if (targetHonor <= tableLast[i][2]) then
+			lastEstStanding = tableLast[i][3]
+			lastEstStandingDiff =  prevStanding - lastEstStanding;
+			break
+		end
+
+		prevStanding = tableLast[i][3];
+	end
+
+	local currEstStanding = 0;
+	local currEstStandingDiff = 0;
+	for i = 1, #tableCurr do
+		if (targetHonor <= tableCurr[i][2]) then
+			currEstStanding = tableCurr[i][3]
+			currEstStandingDiff = prevStanding - currEstStanding;
+			break
+		end
+
+		prevStanding = tableCurr[i][3];
+	end
+
+	if (lastEstStanding == 0 and currEstStanding == 0) then
+		return false
+	end
+
+	if (lastEstStanding > 0 and currEstStanding > 0) then
+		if (lastEstStandingDiff < currEstStandingDiff) then
+			return lastEstStanding;
+		else
+			return currEstStanding;
+		end
+	else
+		return lastEstStanding or currEstStanding;
+	end
+end
+
+function HonorSpy:Estimate(playerOfInterest)
 	if (not playerOfInterest) then
 		playerOfInterest = playerName
 	end
 	playerOfInterest = string.utf8upper(string.utf8sub(playerOfInterest, 1, 1))..string.utf8lower(string.utf8sub(playerOfInterest, 2))
 
-	local t = buildStandingsTable
-	if (not t) then
-		t = HonorSpy:BuildStandingsTable()
-	end
-
+	local t = HonorSpy:BuildStandingsTable()
 	local standing = -1;
+	local index = -1;
 	local avg_lastchecked = 0;
 	local pool_size = #t;
 
 	for i = 1, pool_size do
 		if (playerOfInterest == t[i][1]) then
-			standing = i
+			index = i
 		end
 	end
-	if (standing == -1) then
+
+	estStanding = HonorSpy:EstimateStanding(playerOfInterest)
+	if (estStanding == false) then
+		standing = index;
+	else
+		standing = estStanding;
+	end
+
+	if (index == -1) then
 		return
 	end;
 
@@ -342,7 +427,7 @@ function HonorSpy:Estimate(playerOfInterest, buildStandingsTable)
 		end
 	end
 
-	return pool_size, standing, bracket, RP, EstRP, Rank, Progress, EstRank, EstProgress
+	return pool_size, index, standing, bracket, RP, EstRP, Rank, Progress, EstRank, EstProgress
 end
 
 function HonorSpy:Report(playerOfInterest, skipUpdate)
@@ -354,8 +439,8 @@ function HonorSpy:Report(playerOfInterest, skipUpdate)
 	end
 	playerOfInterest = string.utf8upper(string.utf8sub(playerOfInterest, 1, 1))..string.utf8lower(string.utf8sub(playerOfInterest, 2))
 	
-	local pool_size, standing, bracket, RP, EstRP, Rank, Progress, EstRank, EstProgress = HonorSpy:Estimate(playerOfInterest)
-	if (not standing) then
+	local pool_size, index, standing, bracket, RP, EstRP, Rank, Progress, EstRank, EstProgress = HonorSpy:Estimate(playerOfInterest)
+	if (not index) then
 		self:Print(format(L["Player %s not found in table"], playerOfInterest));
 		return
 	end
@@ -363,7 +448,7 @@ function HonorSpy:Report(playerOfInterest, skipUpdate)
 	if (playerOfInterest ~= playerName) then
 		text = text .. format("%s <%s>: ", L['Progress of'], playerOfInterest)
 	end
-	text = text .. format("%s = %d, %s = %d, %s = %d, %s = %d (%d%%), %s = %d (%d%%)", L["Standing"], standing, L["Bracket"], bracket, L["Next Week RP"], EstRP, L["Rank"], Rank, Progress, L["Next Week Rank"], EstRank, EstProgress)
+	text = text .. format("%s = %d, %s = %d, %s = %d, %s = %d (%d%%), %s = %d (%d%%)", L["EstStanding"], standing, L["Bracket"], bracket, L["Next Week RP"], EstRP, L["Rank"], Rank, Progress, L["Next Week Rank"], EstRank, EstProgress)
 	SendChatMessage(text, "emote")
 end
 
@@ -659,6 +744,8 @@ function PrintWelcomeMsg()
 	if (realm == "Earthshaker" and faction == "Horde") then
 		msg = msg .. format("You are lucky enough to play with HonorSpy author on one |cffFFFFFF%s |cff209f9brealm! Feel free to mail me (|cff8787edKakysha|cff209f9b) a supportive %s  tip or kind word!", realm, GetCoinTextureString(50000))
 	end
+	msg = msg .. "欢迎使用 |cff8787edBinkcn|cff209f9b 修改版本，该版本针对国服优化，并且可以在仅具备较少本地数据的情况下计算出更准确的下周军衔。"
+	msg = msg .. "此版本Bug反馈及功能建议请移步：\nhttps://github.com/Binkcn/HonorSpy"
 	HonorSpy:Print(msg .. "|r")
 end
 
