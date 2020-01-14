@@ -14,7 +14,10 @@ local startRemovingFakes = false
 function HonorSpy:OnInitialize()
 	self.db = LibStub("AceDB-3.0"):New("HonorSpyDB", {
 		factionrealm = {
+			currentPlayerNumber = 0,
 			currentStandings = {},
+			lastPlayerNumber = 0,
+			lastStandings = {},
 			last_reset = 0,
 			minimapButton = {hide = false},
 			actualCommPrefix = "",
@@ -93,7 +96,7 @@ function HonorSpy:INSPECT_HONOR_UPDATE()
 	if (player == nil) then return end
 	if (player.class == nil) then player.class = "nil" end
 
-	local _, _, _, _, thisweekHK, thisWeekHonor, _, lastWeekHonor, standing = GetInspectHonorData();
+	local todayHK, _, _, _, thisweekHK, thisWeekHonor, _, lastWeekHonor, standing = GetInspectHonorData();
 	player.thisWeekHonor = thisWeekHonor;
 	player.lastWeekHonor = lastWeekHonor;
 	player.standing = standing;
@@ -106,12 +109,13 @@ function HonorSpy:INSPECT_HONOR_UPDATE()
 	player.last_checked = GetServerTime();
 	player.RP = 0;
 
-	if (thisweekHK >= 15) then
+	if (todayHK >= 25 or thisweekHK >= 25) then
 		if (player.rank >= 3) then
 			player.RP = math.ceil((player.rank-2) * 5000 + player.rankProgress * 5000)
 		elseif (player.rank == 2) then
 			player.RP = math.ceil(player.rankProgress * 3000 + 2000)
 		end
+
 		if (lastPlayer and lastPlayer.honor == thisWeekHonor and lastPlayer.name ~= inspectedPlayerName) then
 			return
 		end
@@ -166,7 +170,7 @@ function CHAT_MSG_COMBAT_HONOR_GAIN_FILTER(_s, e, msg, ...)
 	if (not victim) then
 		return
 	end
-	return false, format("%s kills: %d, honor: |cff00FF96%d", msg, HonorSpy.db.char.today_kills[victim] or 0, est_honor), ...
+	return false, format("%s today kills: %d, honor: |cff00FF96%d", msg, HonorSpy.db.char.today_kills[victim] or 0, est_honor), ...
 end
 
 -- INSPECT HOOKS pausing to not mess with native inspect calls
@@ -385,19 +389,31 @@ function class_exist(className)
 	return false
 end
 
-function playerIsValid(player)
-	if (not player.last_checked or type(player.last_checked) ~= "number" or player.last_checked < HonorSpy.db.factionrealm.last_reset + 24*60*60
+function playerIsValid(playerName, player)
+	if (not player.last_checked or type(player.last_checked) ~= "number"
 		or player.last_checked > GetServerTime()
-		or not player.thisWeekHonor or type(player.thisWeekHonor) ~= "number" or player.thisWeekHonor == 0
-		or not player.lastWeekHonor or type(player.lastWeekHonor) ~= "number"
-		or not player.standing or type(player.standing) ~= "number"
-		or not player.RP or type(player.RP) ~= "number"
-		or not player.rankProgress or type(player.rankProgress) ~= "number"
-		or not player.rank or type(player.rank) ~= "number"
-		or not player.class or not class_exist(player.class)
+		or not player.thisWeekHonor		or type(player.thisWeekHonor) ~= "number"
+		or not player.lastWeekHonor		or type(player.lastWeekHonor) ~= "number"
+		or not player.standing			or type(player.standing) ~= "number"
+		or not player.RP				or type(player.RP) ~= "number"
+		or not player.rankProgress		or type(player.rankProgress) ~= "number"
+		or not player.rank				or type(player.rank) ~= "number"
+		or not player.class				or not class_exist(player.class)
 		) then
 		return false
 	end
+
+	local lastPlayer = HonorSpy.db.factionrealm.lastStandings[playerName];
+	if (lastPlayer ~= nil) then
+		if(lastPlayer.lastWeekHonor == player.lastWeekHonor and lastPlayer.standing == player.standing) then
+			return false
+		end
+	else
+		if (player.last_checked < HonorSpy.db.factionrealm.last_reset + 24*60*60 or player.thisWeekHonor == 0) then
+			return false
+		end
+	end
+
 	return true
 end
 
@@ -409,13 +425,16 @@ function isFakePlayer(playerName)
 end
 
 function store_player(playerName, player)
-	if (player == nil or playerName == nil or playerName:find("[%d%p%s%c%z]") or isFakePlayer(playerName) or not playerIsValid(player)) then return end
-	
+	if (player == nil or playerName == nil or playerName:find("[%d%p%s%c%z]") or isFakePlayer(playerName) or not playerIsValid(playerName, player)) then return end
 	local player = table.copy(player);
 	local localPlayer = HonorSpy.db.factionrealm.currentStandings[playerName];
 	if (localPlayer == nil or localPlayer.last_checked < player.last_checked) then
 		HonorSpy.db.factionrealm.currentStandings[playerName] = player;
 		HonorSpy:TestNextFakePlayer();
+
+		if (player.standing > HonorSpy.db.factionrealm.currentPlayerNumber) then
+			HonorSpy.db.factionrealm.currentPlayerNumber = player.standing;
+		end
 	end
 end
 
@@ -533,8 +552,11 @@ end
 -- RESET WEEK
 function HonorSpy:Purge()
 	inspectedPlayers = {};
+	HonorSpy.db.factionrealm.lastStandings=HonorSpy.db.factionrealm.currentStandings;
 	HonorSpy.db.factionrealm.currentStandings={};
 	HonorSpy.db.factionrealm.fakePlayers={};
+	HonorSpy.db.factionrealm.lastPlayerNumber=HonorSpy.db.factionrealm.currentPlayerNumber;
+	HonorSpy.db.factionrealm.currentPlayerNumber = 0;
 	HonorSpy.db.char.original_honor = 0;
 	HonorSpyGUI:Reset();
 	HonorSpy:Print(L["All data was purged"]);
@@ -642,7 +664,7 @@ end
 
 function DBHealthCheck()
 	for playerName, player in pairs(HonorSpy.db.factionrealm.currentStandings) do
-		if (not playerIsValid(player)) then
+		if (not playerIsValid(playerName, player)) then
 			HonorSpy.db.factionrealm.currentStandings[playerName] = nil
 			HonorSpy:Print("removed bad table row", playerName)
 		end
