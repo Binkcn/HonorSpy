@@ -55,7 +55,9 @@ local inspectedPlayerName = nil; -- name of currently inspected player
 
 local function StartInspecting(unitID)
 	local name, realm = UnitName(unitID);
-	if (paused or (realm and realm ~= "")) then
+	local level = UnitLevel(unitID);
+
+	if (paused or level ~= 60 or (realm and realm ~= "")) then
 		return
 	end
 	if (name ~= inspectedPlayerName) then -- changed target, clear currently inspected player
@@ -170,7 +172,7 @@ function CHAT_MSG_COMBAT_HONOR_GAIN_FILTER(_s, e, msg, ...)
 	if (not victim) then
 		return
 	end
-	return false, format("%s Today kills: %d, Estimated honor: |cff00FF96%d", msg, HonorSpy.db.char.today_kills[victim] or 0, est_honor), ...
+	return false, format("%s %s: %d, %s: |cff00FF96%d", msg, L["Today Kills"], HonorSpy.db.char.today_kills[victim] or 0, L["Estimated Honor"], est_honor), ...
 end
 
 -- INSPECT HOOKS pausing to not mess with native inspect calls
@@ -238,10 +240,6 @@ LibStub("AceConfig-3.0"):RegisterOptionsTable("HonorSpy", options, {"honorspy", 
 
 function HonorSpy:BuildStandingsTable(sort_by)
 	local t = { }
-	for playerName, player in pairs(HonorSpy.db.factionrealm.currentStandings) do
-		table.insert(t, {playerName, player.class, player.thisWeekHonor or 0, player.lastWeekHonor or 0, player.standing or 0, player.RP or 0, player.rank or 0, player.last_checked or 0})
-	end
-	
 	local sort_type = 'desc';
 	local sort_column = 3; -- ThisWeekHonor
 
@@ -254,24 +252,74 @@ function HonorSpy:BuildStandingsTable(sort_by)
 		sort_type = 'desc';
 	end
 
+	for playerName, player in pairs(HonorSpy.db.factionrealm.currentStandings) do
+		table.insert(t, {playerName, player.class, player.thisWeekHonor or 0, player.lastWeekHonor or 0, player.standing or 0, player.RP or 0, player.rank or 0, player.last_checked or 0});
+	end
+
+	if (sort_type == 'asc') then
+		for i = 1, #t do
+			if (t[i][sort_column] == 0) then
+				table.remove(t, i);
+			else
+				break;
+			end
+		end
+	end
+
 	local sort_func_desc = function(a,b)
-		return a[sort_column] > b[sort_column]
+		return a[sort_column] > b[sort_column];
 	end
 
 	local sort_func_asc = function(a,b)
-		return a[sort_column] < b[sort_column]
+		return a[sort_column] < b[sort_column];
 	end
 
 	if (sort_type == 'desc') then
-		table.sort(t, sort_func_desc)
+		table.sort(t, sort_func_desc);
 	else
-		table.sort(t, sort_func_asc)
+		table.sort(t, sort_func_asc);
 	end
 
 	return t
 end
 
 -- REPORT
+function HonorSpy:GetPoolSize(pool_size)
+
+	local currentPlayerNumber = HonorSpy.db.factionrealm.currentPlayerNumber;
+	local lastPlayerNumber = HonorSpy.db.factionrealm.lastPlayerNumber;
+
+	if (currentPlayerNumber and type(currentPlayerNumber) == "number" and currentPlayerNumber > pool_size) then
+		pool_size = currentPlayerNumber;
+	end
+	
+	-- Compatible with old data
+	if (lastPlayerNumber and type(lastPlayerNumber) == "number" and lastPlayerNumber == 0) then
+		local t = { };
+
+		for playerName, player in pairs(HonorSpy.db.factionrealm.lastStandings) do
+			table.insert(t, {playerName, player.lastWeekHonor or 0, player.standing or 0});
+		end
+
+		-- Sort
+		local sort_func_desc = function(a, b)
+			return a[3] > b[3];
+		end
+
+		table.sort(t, sort_func_desc);
+
+		lastPlayerNumber = t[1][3];
+
+		HonorSpy.db.factionrealm.lastPlayerNumber = lastPlayerNumber;
+	end
+
+	if (lastPlayerNumber and type(lastPlayerNumber) == "number" and lastPlayerNumber > pool_size) then
+		pool_size = lastPlayerNumber;
+	end
+
+	return pool_size;
+end
+
 function HonorSpy:GetBrackets(pool_size)
 			  -- 1   2       3      4	  5		 6		7	   8		9	 10		11		12		13	14
 	local brk =  {1, 0.845, 0.697, 0.566, 0.436, 0.327, 0.228, 0.159, 0.100, 0.060, 0.035, 0.020, 0.008, 0.003} -- brackets percentage
@@ -280,13 +328,7 @@ function HonorSpy:GetBrackets(pool_size)
 		return brk
 	end
 
-	if (HonorSpy.db.factionrealm.currentPlayerNumber > pool_size) then
-		pool_size = HonorSpy.db.factionrealm.currentPlayerNumber;
-	end
-	
-	if (HonorSpy.db.factionrealm.lastPlayerNumber > pool_size) then
-		pool_size = HonorSpy.db.factionrealm.lastPlayerNumber;
-	end
+	pool_size = HonorSpy:GetPoolSize(pool_size);
 
 	for i = 1,14 do
 		brk[i] = math.floor(brk[i]*pool_size+.5)
@@ -329,7 +371,7 @@ function HonorSpy:EstimateStanding(playerOfInterest)
 	local lastEstStanding = 0;
 	local lastEstStandingDiff = 0;
 	for i = 1, #tableLast do
-		if (targetHonor <= tableLast[i][2]) then
+		if (tableLast[i][2] > 0 and targetHonor <= tableLast[i][2]) then
 			lastEstStanding = tableLast[i][3]
 			lastEstStandingDiff =  prevStanding - lastEstStanding;
 			break
@@ -341,7 +383,7 @@ function HonorSpy:EstimateStanding(playerOfInterest)
 	local currEstStanding = 0;
 	local currEstStandingDiff = 0;
 	for i = 1, #tableCurr do
-		if (targetHonor <= tableCurr[i][2]) then
+		if (tableCurr[i][2] > 0 and targetHonor <= tableCurr[i][2]) then
 			currEstStanding = tableCurr[i][3]
 			currEstStandingDiff = prevStanding - currEstStanding;
 			break
@@ -448,7 +490,7 @@ function HonorSpy:Report(playerOfInterest, skipUpdate)
 	if (playerOfInterest ~= playerName) then
 		text = text .. format("%s <%s>: ", L['Progress of'], playerOfInterest)
 	end
-	text = text .. format("%s = %d, %s = %d, %s = %d, %s = %d (%d%%), %s = %d (%d%%)", L["EstStanding"], standing, L["Bracket"], bracket, L["Next Week RP"], EstRP, L["Rank"], Rank, Progress, L["Next Week Rank"], EstRank, EstProgress)
+	text = text .. format("%s = %d, %s = %d, %s = %d, %s = %d (%d%%), %s = %d (%d%%)", L["Estimated Standing"], standing, L["Bracket"], bracket, L["Next Week RP"], EstRP, L["Rank"], Rank, Progress, L["Next Week Rank"], EstRank, EstProgress)
 	SendChatMessage(text, "emote")
 end
 
@@ -749,6 +791,34 @@ function PrintWelcomeMsg()
 	HonorSpy:Print(msg .. "|r")
 end
 
+function RemoveCorruptData(tableStandings)
+	local t = { }
+	for playerName, player in pairs(tableStandings) do
+		table.insert(t, {playerName, player.lastWeekHonor or 0, player.standing or 0});
+	end
+
+	-- Sort
+	local sort_func_asc = function(a, b)
+		return a[2] < b[2]
+	end
+
+	table.sort(t, sort_func_asc)
+
+	local prevRow = nil;
+	for i = 1, #t do
+		if (t[i][2] > 0) then
+			if (prevRow ~= nil and t[i][3] > prevRow[3]) then
+				tableStandings[prevRow[1]] = nil;
+
+				RemoveCorruptData(tableStandings);
+				break;
+			end
+
+			prevRow = t[i];
+		end
+	end
+end
+
 function DBHealthCheck()
 	for playerName, player in pairs(HonorSpy.db.factionrealm.currentStandings) do
 		if (not playerIsValid(playerName, player)) then
@@ -756,6 +826,9 @@ function DBHealthCheck()
 			HonorSpy:Print("removed bad table row", playerName)
 		end
 	end
+
+	RemoveCorruptData(HonorSpy.db.factionrealm.lastStandings);
+	RemoveCorruptData(HonorSpy.db.factionrealm.currentStandings);
 
 	if (HonorSpy.db.factionrealm.actualCommPrefix ~= commPrefix) then
 		HonorSpy:Purge()

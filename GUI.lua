@@ -34,7 +34,10 @@ function GUI:Show(skipUpdate, sort_column)
 	end
 	
 	rows = HonorSpy:BuildStandingsTable(sort_column)
+
 	local brk = HonorSpy:GetBrackets(#rows)
+	local totalPlayerNumber = HonorSpy:GetPoolSize(#rows);
+
 	for i = 1, #brk do
 		for j = brk[i], (brk[i+1] or 0)+1, -1 do
 			brackets[j] = i
@@ -42,13 +45,15 @@ function GUI:Show(skipUpdate, sort_column)
 	end
 
 	local poolSizeText = format(L['Pool Size'] .. ': %d ', #rows)
+
 	statusLine:SetText('|cff777777/hs show|r                                                       ' .. poolSizeText .. '                                             |cff777777/hs search nickname|r')
 
 	local pool_size, index, standing, bracket, RP, EstRP, Rank, Progress, EstRank, EstProgress = HonorSpy:Estimate(false)
 	if (index) then
 		local playerText = colorize(L['Progress of'], "GREY") .. ' ' .. colorize(playerName, HonorSpy.db.factionrealm.currentStandings[playerName].class)
-		playerText = playerText .. ", " .. colorize(L['Estimated Honor'] .. ': ', "GREY") .. colorize(HonorSpy.db.char.estimated_honor, "ORANGE")
-		playerText = playerText .. '\n' .. colorize(L['Standing'] .. ':', "GREY") .. colorize(standing, "ORANGE")
+		playerText = playerText .. ', ' .. colorize(L['Estimated Honor'] .. ': ', "GREY") .. colorize(HonorSpy.db.char.estimated_honor, "ORANGE")
+		playerText = playerText .. ', ' .. colorize(L['Estimated Standing'] .. ':', "GREY") .. colorize(standing, "ORANGE")
+		playerText = playerText .. '\n' .. colorize(L['Total Player Number'] .. ':', "GREY") .. colorize(totalPlayerNumber, "ORANGE")
 		playerText = playerText .. ' ' .. colorize(L['Bracket'] .. ':', "GREY") .. colorize(bracket, "ORANGE")
 		playerText = playerText .. ' ' .. colorize(L['Current Rank'] .. ':', "GREY") .. colorize(format('%d (%d%%)', Rank, Progress), "ORANGE")
 		playerText = playerText .. ' ' .. colorize(L['Next Week Rank'] .. ':', "GREY") .. colorize(format('%d (%d%%)', EstRank, EstProgress), EstRP >= RP and "GREEN" or "RED")
