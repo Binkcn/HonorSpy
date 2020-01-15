@@ -8,8 +8,6 @@ LibStub("AceHook-3.0"):Embed(GUI)
 
 local mainFrame, statusLine, playerStandings, reportBtn, scroll = nil, nil, nil, nil
 local rows, brackets = {}, {}
-local playersPerRow = 50
-local needsRelayout = true
 
 local colors = {
 	["ORANGE"] = "ff7f00",
@@ -34,19 +32,13 @@ function GUI:Show(skipUpdate, sort_column)
 	end
 	
 	rows = HonorSpy:BuildStandingsTable(sort_column)
+	brackets = HonorSpy:GetBracketsByStanding(#rows)
 
-	local brk = HonorSpy:GetBrackets(#rows)
 	local totalPlayerNumber = HonorSpy:GetPoolSize(#rows);
-
-	for i = 1, #brk do
-		for j = brk[i], (brk[i+1] or 0)+1, -1 do
-			brackets[j] = i
-		end
-	end
 
 	local poolSizeText = format(L['Pool Size'] .. ': %d ', #rows)
 
-	statusLine:SetText('|cff777777/hs show|r                                                       ' .. poolSizeText .. '                                             |cff777777/hs search nickname|r')
+	statusLine:SetText('|cff777777/hs show|r                                              ' .. poolSizeText .. '                                      |cff777777/hs search nickname|r')
 
 	local pool_size, index, standing, bracket, RP, EstRP, Rank, Progress, EstRank, EstProgress = HonorSpy:Estimate(false)
 	if (index) then
@@ -59,7 +51,9 @@ function GUI:Show(skipUpdate, sort_column)
 		playerText = playerText .. ' ' .. colorize(L['Next Week Rank'] .. ':', "GREY") .. colorize(format('%d (%d%%)', EstRank, EstProgress), EstRP >= RP and "GREEN" or "RED")
 		playerStandings:SetText(playerText .. '\n')
 
-		scroll.scrollBar:SetValue(index * scroll.buttonHeight-200)
+		-- TODO???
+		-- HonorSpy:Print(index)
+		-- scroll.scrollBar:SetValue( (index-1) * scroll.buttonHeight-200)
 		scroll.scrollBar.thumbTexture:Show()
 	else
 		playerStandings:SetText(format('%s %s, %s: %s\n%s\n', L['Progress of'], playerName, colorize(L['Estimated Honor'], "GREY"), colorize(HonorSpy.db.char.estimated_honor, "ORANGE"), L['You have 0 honor or not enough HKs, min = 15']))
@@ -95,56 +89,68 @@ end
 function GUI:UpdateTableView()
 	local buttons = HybridScrollFrame_GetButtons(scroll);
 	local offset = HybridScrollFrame_GetOffset(scroll);
-	local brk_delim_inserted = false
+	local display_bracket = 0;
 
 	for buttonIndex = 1, #buttons do
 		local button = buttons[buttonIndex];
 		local itemIndex = buttonIndex + offset;
 
-		if (itemIndex > 1 and brackets[itemIndex] and brackets[itemIndex-1] ~= brackets[itemIndex] and not brk_delim_inserted) then
-			offset = offset-1
-			brk_delim_inserted = true
-			button.Name:SetText(colorize(format(L["Bracket"] .. " %d", brackets[itemIndex]), "GREY"))
-			button.Honor:SetText();
-			button.LstWkHonor:SetText();
-			button.Standing:SetText();
-			button.RP:SetText();
-			button.Rank:SetText();
-			button.LastSeen:SetText();
-			button.Background:SetTexture("Interface/Glues/CharacterCreate/CharacterCreateMetalFrameHorizontal")
-			button.Highlight:SetTexture()
-			button:Show();
-		
-		elseif (itemIndex <= #rows) then
+		if (itemIndex <= #rows) then
 			local name, class, thisWeekHonor, lastWeekHonor, standing, RP, rank, last_checked = unpack(rows[itemIndex])
-			local last_seen, last_seen_human = (GetServerTime() - last_checked), ""
-			if (last_seen/60/60/24 > 1) then
-				last_seen_human = ""..math.floor(last_seen/60/60/24)..L["d"]
-			elseif (last_seen/60/60 > 1) then
-				last_seen_human = ""..math.floor(last_seen/60/60)..L["h"]
-			elseif (last_seen/60 > 1) then
-				last_seen_human = ""..math.floor(last_seen/60)..L["m"]
-			else
-				last_seen_human = ""..last_seen..L["s"]
-			end
-			button:SetID(itemIndex);
-			button.Name:SetText(colorize(itemIndex .. ')  ', "GREY") .. colorize(name, class));
-			button.Honor:SetText(colorize(thisWeekHonor, class));
-			button.LstWkHonor:SetText(colorize(lastWeekHonor, class));
-			button.Standing:SetText(colorize(standing, class));
-			button.RP:SetText(colorize(RP, class));
-			button.Rank:SetText(colorize(rank, class));
-			button.LastSeen:SetText(colorize(last_seen_human, class));
 
-			if (name == playerName) then
-				button.Background:SetColorTexture(0.5, 0.5, 0.5, 0.2)
-			else
-				button.Background:SetColorTexture(0, 0, 0, 0.2)
+			for idx = 1, #brackets do
+				if (thisWeekHonor >= brackets[idx][2]) then
+					bracket = brackets[idx][1];
+					break;
+				end
 			end
-			button.Highlight:SetColorTexture(1, 0.75, 0, 0.2)
 
-			brk_delim_inserted = false
-			button:Show();
+			if (display_bracket ~= bracket) then
+				offset = offset-1
+
+				button.Name:SetText(colorize(format(L["Bracket"] .. " %d", bracket), "GREY"))
+				button.Honor:SetText();
+				button.LstWkHonor:SetText();
+				button.Standing:SetText();
+				button.RP:SetText();
+				button.Rank:SetText();
+				button.LastSeen:SetText();
+				button.Background:SetTexture("Interface/Glues/CharacterCreate/CharacterCreateMetalFrameHorizontal")
+				button.Highlight:SetTexture()
+				button:Show();
+
+				display_bracket = bracket;
+			else
+				local last_seen, last_seen_human = (GetServerTime() - last_checked), ""
+
+				if (last_seen/60/60/24 > 1) then
+					last_seen_human = ""..math.floor(last_seen/60/60/24)..L["d"]
+				elseif (last_seen/60/60 > 1) then
+					last_seen_human = ""..math.floor(last_seen/60/60)..L["h"]
+				elseif (last_seen/60 > 1) then
+					last_seen_human = ""..math.floor(last_seen/60)..L["m"]
+				else
+					last_seen_human = ""..last_seen..L["s"]
+				end
+
+				button:SetID(itemIndex);
+				button.Name:SetText(colorize(itemIndex .. ')  ', "GREY") .. colorize(name, class));
+				button.Honor:SetText(colorize(thisWeekHonor, class));
+				button.LstWkHonor:SetText(colorize(lastWeekHonor, class));
+				button.Standing:SetText(colorize(standing, class));
+				button.RP:SetText(colorize(RP, class));
+				button.Rank:SetText(colorize(rank, class));
+				button.LastSeen:SetText(colorize(last_seen_human, class));
+
+				if (name == playerName) then
+					button.Background:SetColorTexture(0.5, 0.5, 0.5, 0.2)
+				else
+					button.Background:SetColorTexture(0, 0, 0, 0.2)
+				end
+				button.Highlight:SetColorTexture(1, 0.75, 0, 0.2)
+
+				button:Show();
+			end
 		else
 			button:Hide();
 		end
@@ -163,7 +169,7 @@ function GUI:PrepareGUI()
 	_G["HonorSpyGUI_MainFrame"] = mainFrame
 	tinsert(UISpecialFrames, "HonorSpyGUI_MainFrame")	-- allow ESC close
 	mainFrame:SetTitle(L["HonorSpy Standings"])
-	mainFrame:SetWidth(600)
+	mainFrame:SetWidth(800)
 	mainFrame:SetLayout("List")
 	mainFrame:EnableResize(false)
 
@@ -174,12 +180,12 @@ function GUI:PrepareGUI()
 	mainFrame:AddChild(playerStandingsGrp)
 
 	playerStandings = AceGUI:Create("Label")
-	playerStandings:SetRelativeWidth(0.8)
+	playerStandings:SetRelativeWidth(0.76)
 	playerStandings:SetText('\n\n')
 	playerStandingsGrp:AddChild(playerStandings)
 
 	reportBtn = AceGUI:Create("Button")
-	reportBtn:SetRelativeWidth(0.19)
+	reportBtn:SetRelativeWidth(0.22)
 	reportBtn.text:SetFontObject("SystemFont_NamePlate")
 	reportBtn:SetCallback("OnClick", function()
 		HonorSpy:Report(UnitIsPlayer("target") and UnitName("target") or nil)
@@ -193,7 +199,7 @@ function GUI:PrepareGUI()
 	mainFrame:AddChild(tableHeader)
 
 	local btn = AceGUI:Create("InteractiveLabel")
-	btn:SetWidth(150)
+	btn:SetWidth(180)
 	btn:SetText(colorize(L["Name"], "ORANGE"))
 	tableHeader:AddChild(btn)
 
@@ -202,12 +208,12 @@ function GUI:PrepareGUI()
 		GUI:Show(false, L["Honor"])
 	end)
 	btn.highlight:SetColorTexture(0.3, 0.3, 0.3, 0.5)
-	btn:SetWidth(80)
+	btn:SetWidth(100)
 	btn:SetText(colorize(L["Honor"], "ORANGE"))
 	tableHeader:AddChild(btn)
 
 	btn = AceGUI:Create("InteractiveLabel")
-	btn:SetWidth(80)
+	btn:SetWidth(100)
 	btn:SetText(colorize(L["LstWkHonor"], "ORANGE"))
 	tableHeader:AddChild(btn)
 
@@ -216,12 +222,12 @@ function GUI:PrepareGUI()
 		GUI:Show(false, L["Standing"])
 	end)
 	btn.highlight:SetColorTexture(0.3, 0.3, 0.3, 0.5)
-	btn:SetWidth(60)
+	btn:SetWidth(80)
 	btn:SetText(colorize(L["Standing"], "ORANGE"))
 	tableHeader:AddChild(btn)
 
 	btn = AceGUI:Create("InteractiveLabel")
-	btn:SetWidth(70)
+	btn:SetWidth(80)
 	btn:SetText(colorize(L["RP"], "ORANGE"))
 	tableHeader:AddChild(btn)
 
@@ -230,7 +236,7 @@ function GUI:PrepareGUI()
 		GUI:Show(false, L["Rank"])
 	end)
 	btn.highlight:SetColorTexture(0.3, 0.3, 0.3, 0.5)
-	btn:SetWidth(50)
+	btn:SetWidth(80)
 	btn:SetText(colorize(L["Rank"], "ORANGE"))
 	tableHeader:AddChild(btn)
 

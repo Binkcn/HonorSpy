@@ -253,17 +253,13 @@ function HonorSpy:BuildStandingsTable(sort_by)
 	end
 
 	for playerName, player in pairs(HonorSpy.db.factionrealm.currentStandings) do
-		table.insert(t, {playerName, player.class, player.thisWeekHonor or 0, player.lastWeekHonor or 0, player.standing or 0, player.RP or 0, player.rank or 0, player.last_checked or 0});
-	end
-
-	if (sort_type == 'asc') then
-		for i = 1, #t do
-			if (t[i][sort_column] == 0) then
-				table.remove(t, i);
-			else
-				break;
-			end
+		-- Add today honor
+		thisWeekHonor = player.thisWeekHonor or 0;
+		if (playerName == UnitName("player")) then
+			thisWeekHonor = HonorSpy.db.char.estimated_honor;
 		end
+
+		table.insert(t, {playerName, player.class, thisWeekHonor, player.lastWeekHonor or 0, player.standing or 0, player.RP or 0, player.rank or 0, player.last_checked or 0});
 	end
 
 	local sort_func_desc = function(a,b)
@@ -278,6 +274,14 @@ function HonorSpy:BuildStandingsTable(sort_by)
 		table.sort(t, sort_func_desc);
 	else
 		table.sort(t, sort_func_asc);
+	end
+
+	if (sort_type == 'asc') then
+		for i = #t, 1, -1 do
+			if (t[i][sort_column] == 0) then
+				table.remove(t, i);
+			end
+		end
 	end
 
 	return t
@@ -320,6 +324,27 @@ function HonorSpy:GetPoolSize(pool_size)
 	return pool_size;
 end
 
+function HonorSpy:GetBracketsByStanding(pool_size)
+			  -- 1   2       3      4	  5		 6		7	   8		9	 10		11		12		13	14
+	local brk =  {1, 0.845, 0.697, 0.566, 0.436, 0.327, 0.228, 0.159, 0.100, 0.060, 0.035, 0.020, 0.008, 0.003} -- brackets percentage
+	local brackets = {}
+
+	if (not pool_size) then
+		return brk
+	end
+
+	pool_size = HonorSpy:GetPoolSize(pool_size);
+
+	for i = 14, 1, -1 do
+		standing = math.floor(brk[i]*pool_size+.5);
+		honor = HonorSpy:EstimateQuery('Standing', standing);
+
+		table.insert(brackets, {i, honor or 0, standing or 0})
+	end
+
+	return brackets
+end
+
 function HonorSpy:GetBrackets(pool_size)
 			  -- 1   2       3      4	  5		 6		7	   8		9	 10		11		12		13	14
 	local brk =  {1, 0.845, 0.697, 0.566, 0.436, 0.327, 0.228, 0.159, 0.100, 0.060, 0.035, 0.020, 0.008, 0.003} -- brackets percentage
@@ -336,74 +361,72 @@ function HonorSpy:GetBrackets(pool_size)
 	return brk
 end
 
-function HonorSpy:EstimateStanding(playerOfInterest)
+function HonorSpy:EstimateQuery(queryType, queryValue)
 	local tableCurr = { }
 	local tableLast = { }
 
-	local targetHonor = 0;
+	local prevRowValue = 0;
 
 	for playerName, player in pairs(HonorSpy.db.factionrealm.currentStandings) do
-		if (playerOfInterest == playerName) then
-			targetHonor = player.thisWeekHonor;
-		end
-
 		table.insert(tableCurr, {playerName, player.lastWeekHonor or 0, player.standing or 0})
 	end
 	for playerName, player in pairs(HonorSpy.db.factionrealm.lastStandings) do
 		table.insert(tableLast, {playerName, player.lastWeekHonor or 0, player.standing or 0})
 	end
 
-	-- Sort
+	if (queryType == 'Honor') then
+		query_column = 2;
+		get_column = 3;
+		sort_column = 2;
+	else
+		query_column = 3;
+		get_column = 2;
+		sort_column = 3;
+	end
+
 	local sort_func_asc = function(a, b)
-		return a[2] < b[2]
+		return a[sort_column] < b[sort_column]
 	end
 
 	table.sort(tableCurr, sort_func_asc)
 	table.sort(tableLast, sort_func_asc)
 
-	-- Target Honor
-	if (playerOfInterest == UnitName("player")) then
-		targetHonor = HonorSpy.db.char.estimated_honor;
-	end
-
-	local prevStanding = 0;
-
-	local lastEstStanding = 0;
-	local lastEstStandingDiff = 0;
+	local lastRowValue = 0;
+	local lastRowValueDiff = 0;
 	for i = 1, #tableLast do
-		if (tableLast[i][2] > 0 and targetHonor <= tableLast[i][2]) then
-			lastEstStanding = tableLast[i][3]
-			lastEstStandingDiff =  prevStanding - lastEstStanding;
+		if (tableLast[i][query_column] > 0 and queryValue <= tableLast[i][query_column]) then
+			lastRowValue = tableLast[i][get_column]
+			lastRowValueDiff =  math.abs(prevRowValue - tableLast[i][query_column]);
 			break
 		end
 
-		prevStanding = tableLast[i][3];
+		prevRowValue = tableLast[i][query_column];
 	end
 
-	local currEstStanding = 0;
-	local currEstStandingDiff = 0;
+	local currRowValue = 0;
+	local currRowValueDiff = 0;
 	for i = 1, #tableCurr do
-		if (tableCurr[i][2] > 0 and targetHonor <= tableCurr[i][2]) then
-			currEstStanding = tableCurr[i][3]
-			currEstStandingDiff = prevStanding - currEstStanding;
+		if (tableCurr[i][query_column] > 0 and queryValue <= tableCurr[i][query_column]) then
+			currRowValue = tableCurr[i][get_column]
+			currRowValueDiff = math.abs(prevRowValue - tableCurr[i][query_column]);
 			break
 		end
 
-		prevStanding = tableCurr[i][3];
+		prevRowValue = tableCurr[i][query_column];
 	end
 
-	if (lastEstStanding == 0 and currEstStanding == 0) then
+	if (lastRowValue == 0 and currRowValue == 0) then
 		return false
 	end
 
-	if (lastEstStanding > 0 and currEstStanding > 0) then
-		if (lastEstStandingDiff < currEstStandingDiff) then
-			return lastEstStanding;
+	if (lastRowValue > 0 and currRowValue > 0) then
+		if (lastRowValueDiff < currRowValueDiff) then
+			return lastRowValue;
 		else
-			return currEstStanding;
+			return currRowValue;
 		end
 	else
-		return lastEstStanding or currEstStanding;
+		return lastRowValue or currRowValue;
 	end
 end
 
@@ -425,7 +448,14 @@ function HonorSpy:Estimate(playerOfInterest)
 		end
 	end
 
-	estStanding = HonorSpy:EstimateStanding(playerOfInterest)
+	local thisWeekHonor = HonorSpy.db.factionrealm.currentStandings[playerOfInterest].thisWeekHonor;
+
+	-- Add today honor
+	if (playerOfInterest == UnitName("player")) then
+		thisWeekHonor = HonorSpy.db.char.estimated_honor;
+	end
+
+	local estStanding = HonorSpy:EstimateQuery('Honor', thisWeekHonor);
 	if (estStanding == false) then
 		standing = index;
 	else

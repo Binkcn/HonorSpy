@@ -3,7 +3,7 @@
 	xsi:schemaLocation="http://www.blizzard.com/wow/ui/..\FrameXML\UI.xsd">
 
 	<Frame name="HybridScrollListItemTemplate" virtual="true">
-		<Size y="12" x="560"/>
+		<Size y="12" x="760"/>
 		<Layers>
 			<Layer level="BACKGROUND">
 				<Texture parentKey="Background" setAllPoints="true">
@@ -12,34 +12,34 @@
 			</Layer>
 			<Layer level="ARTWORK">
 				<FontString parentKey="Name" inherits="GameFontHighlightSmall" justifyH="LEFT">
-					<Size x="150"/>
+					<Size x="180"/>
 				</FontString>
 				<FontString parentKey="Honor" inherits="GameFontHighlightSmall" justifyH="LEFT">
-					<Size x="80"/>
+					<Size x="100"/>
 					<Anchors>
 						<Anchor point="TOPLEFT" relativePoint="TOPRIGHT" relativeKey="$parent.Name"/>
 					</Anchors>
 				</FontString>
 				<FontString parentKey="LstWkHonor" inherits="GameFontHighlightSmall" justifyH="LEFT">
-					<Size x="80"/>
+					<Size x="100"/>
 					<Anchors>
 						<Anchor point="TOPLEFT" relativePoint="TOPRIGHT" relativeKey="$parent.Honor"/>
 					</Anchors>
 				</FontString>
 				<FontString parentKey="Standing" inherits="GameFontHighlightSmall" justifyH="LEFT">
-					<Size x="60"/>
+					<Size x="80"/>
 					<Anchors>
 						<Anchor point="TOPLEFT" relativePoint="TOPRIGHT" relativeKey="$parent.LstWkHonor"/>
 					</Anchors>
 				</FontString>
 				<FontString parentKey="RP" inherits="GameFontHighlightSmall" justifyH="LEFT">
-					<Size x="70"/>
+					<Size x="80"/>
 					<Anchors>
 						<Anchor point="TOPLEFT" relativePoint="TOPRIGHT" relativeKey="$parent.Standing"/>
 					</Anchors>
 				</FontString>
 				<FontString parentKey="Rank" inherits="GameFontHighlightSmall" justifyH="LEFT">
-					<Size x="50"/>
+					<Size x="80"/>
 					<Anchors>
 						<Anchor point="TOPLEFT" relativePoint="TOPRIGHT" relativeKey="$parent.RP"/>
 					</Anchors>
