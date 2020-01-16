@@ -41,13 +41,20 @@ function GUI:Show(skipUpdate, sort_column)
 	rows = HonorSpy:BuildStandingsTable(sort_column)
 	brackets = HonorSpy:GetBracketsByStanding(#rows)
 
+	local index = -1;
 	local totalPlayerNumber = HonorSpy:GetPoolSize(#rows);
+
+	for i = 1, #rows do
+		if (playerName == rows[i][1]) then
+			index = i
+		end
+	end
 
 	local poolSizeText = format(L['Pool Size'] .. ': %d ', #rows)
 
 	statusLine:SetText('|cff777777/hs show|r                                              ' .. poolSizeText .. '                                      |cff777777/hs search nickname|r')
 
-	local pool_size, index, standing, bracket, RP, EstRP, Rank, Progress, EstRank, EstProgress = HonorSpy:Estimate(false)
+	local pool_size, _, standing, bracket, RP, EstRP, Rank, Progress, EstRank, EstProgress = HonorSpy:Estimate(false)
 	if (index) then
 		local playerText = colorize(L['Progress of'], "GREY") .. ' ' .. colorize(playerName, HonorSpy.db.factionrealm.currentStandings[playerName].class)
 		playerText = playerText .. ', ' .. colorize(L['Estimated Honor'] .. ': ', "GREY") .. colorize(HonorSpy.db.char.estimated_honor, "ORANGE")
@@ -58,6 +65,7 @@ function GUI:Show(skipUpdate, sort_column)
 		playerText = playerText .. ' ' .. colorize(L['Next Week Rank'] .. ':', "GREY") .. colorize(format('%d (%d%%)', EstRank, EstProgress), EstRP >= RP and "GREEN" or "RED")
 		playerStandings:SetText(playerText .. '\n')
 
+		HonorSpy:Print(index)
 		scroll.scrollBar:SetValue(index * scroll.buttonHeight-200)
 		scroll.scrollBar.thumbTexture:Show()
 	else
