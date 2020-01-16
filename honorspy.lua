@@ -312,7 +312,9 @@ function HonorSpy:GetPoolSize(pool_size)
 
 		table.sort(t, sort_func_desc);
 
-		lastPlayerNumber = t[1][3];
+		if (#t >= 1) then
+			lastPlayerNumber = t[1][3];
+		end
 
 		HonorSpy.db.factionrealm.lastPlayerNumber = lastPlayerNumber;
 	end
