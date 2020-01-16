@@ -41,7 +41,7 @@ function GUI:Show(skipUpdate, sort_column)
 	rows = HonorSpy:BuildStandingsTable(sort_column)
 	brackets = HonorSpy:GetBracketsByStanding(#rows)
 
-	local index = -1;
+	local index = false;
 	local totalPlayerNumber = HonorSpy:GetPoolSize(#rows);
 
 	for i = 1, #rows do
@@ -65,7 +65,6 @@ function GUI:Show(skipUpdate, sort_column)
 		playerText = playerText .. ' ' .. colorize(L['Next Week Rank'] .. ':', "GREY") .. colorize(format('%d (%d%%)', EstRank, EstProgress), EstRP >= RP and "GREEN" or "RED")
 		playerStandings:SetText(playerText .. '\n')
 
-		HonorSpy:Print(index)
 		scroll.scrollBar:SetValue(index * scroll.buttonHeight-200)
 		scroll.scrollBar.thumbTexture:Show()
 	else
