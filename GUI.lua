@@ -33,7 +33,6 @@ function GUI:Show(skipUpdate, sort_column)
 	end
 
 	if (sort_column == nil or sort_column == L["Honor"]) then
-		HonorSpy:Print(sort_column)
 		show_bracket = true
 	else
 		show_bracket = false
@@ -59,9 +58,7 @@ function GUI:Show(skipUpdate, sort_column)
 		playerText = playerText .. ' ' .. colorize(L['Next Week Rank'] .. ':', "GREY") .. colorize(format('%d (%d%%)', EstRank, EstProgress), EstRP >= RP and "GREEN" or "RED")
 		playerStandings:SetText(playerText .. '\n')
 
-		-- TODO???
-		-- HonorSpy:Print(index)
-		-- scroll.scrollBar:SetValue( (index-1) * scroll.buttonHeight-200)
+		scroll.scrollBar:SetValue(index * scroll.buttonHeight-200)
 		scroll.scrollBar.thumbTexture:Show()
 	else
 		playerStandings:SetText(format('%s %s, %s: %s\n%s\n', L['Progress of'], playerName, colorize(L['Estimated Honor'], "GREY"), colorize(HonorSpy.db.char.estimated_honor, "ORANGE"), L['You have 0 honor or not enough HKs, min = 15']))
@@ -98,8 +95,6 @@ function GUI:UpdateTableView()
 	local buttons = HybridScrollFrame_GetButtons(scroll);
 	local offset = HybridScrollFrame_GetOffset(scroll);
 	local display_bracket = 0;
-
-	HonorSpy:Print(offset, show_bracket)
 
 	for buttonIndex = 1, #buttons do
 		local button = buttons[buttonIndex];
