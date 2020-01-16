@@ -339,10 +339,7 @@ function HonorSpy:GetBracketsByStanding(pool_size)
 
 	for i = 14, 1, -1 do
 		standing = math.floor(brk[i]*pool_size+.5);
-
 		honor = HonorSpy:EstimateQuery('Standing', standing);
-
-		HonorSpy:Print('Query:', i, standing, honor)
 
 		table.insert(brackets, {i, honor or 0, standing or 0})
 	end

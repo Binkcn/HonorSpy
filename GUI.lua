@@ -8,6 +8,7 @@ LibStub("AceHook-3.0"):Embed(GUI)
 
 local mainFrame, statusLine, playerStandings, reportBtn, scroll = nil, nil, nil, nil
 local rows, brackets = {}, {}
+local show_bracket = false
 
 local colors = {
 	["ORANGE"] = "ff7f00",
@@ -30,7 +31,14 @@ function GUI:Show(skipUpdate, sort_column)
 			end
 		end)
 	end
-	
+
+	if (sort_column == nil or sort_column == L["Honor"]) then
+		HonorSpy:Print(sort_column)
+		show_bracket = true
+	else
+		show_bracket = false
+	end
+
 	rows = HonorSpy:BuildStandingsTable(sort_column)
 	brackets = HonorSpy:GetBracketsByStanding(#rows)
 
@@ -91,21 +99,26 @@ function GUI:UpdateTableView()
 	local offset = HybridScrollFrame_GetOffset(scroll);
 	local display_bracket = 0;
 
+	HonorSpy:Print(offset, show_bracket)
+
 	for buttonIndex = 1, #buttons do
 		local button = buttons[buttonIndex];
 		local itemIndex = buttonIndex + offset;
 
 		if (itemIndex <= #rows) then
 			local name, class, thisWeekHonor, lastWeekHonor, standing, RP, rank, last_checked = unpack(rows[itemIndex])
+			local bracket = nil;
 
-			for idx = 1, #brackets do
-				if (thisWeekHonor >= brackets[idx][2]) then
-					bracket = brackets[idx][1];
-					break;
+			if (show_bracket == true) then
+				for idx = 1, #brackets do
+					if (thisWeekHonor >= brackets[idx][2]) then
+						bracket = brackets[idx][1];
+						break;
+					end
 				end
 			end
 
-			if (display_bracket ~= bracket) then
+			if (show_bracket == true and display_bracket ~= bracket) then
 				offset = offset-1
 
 				button.Name:SetText(colorize(format(L["Bracket"] .. " %d", bracket), "GREY"))
