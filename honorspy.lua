@@ -431,7 +431,7 @@ function HonorSpy:EstimateQuery(queryType, queryValue)
 		if (lastRowValue > 0) then
 			return lastRowValue;
 		end
-		
+
 		if (currRowValue > 0) then
 			return currRowValue;
 		end
@@ -456,6 +456,10 @@ function HonorSpy:Estimate(playerOfInterest)
 		end
 	end
 
+	if (index == -1) then
+		return
+	end;
+
 	local thisWeekHonor = HonorSpy.db.factionrealm.currentStandings[playerOfInterest].thisWeekHonor;
 
 	-- Add today honor
@@ -469,10 +473,6 @@ function HonorSpy:Estimate(playerOfInterest)
 	else
 		standing = estStanding;
 	end
-
-	if (index == -1) then
-		return
-	end;
 
 	local RP  = {0, 400} -- RP for each bracket
 	local Ranks = {0, 2000} -- RP for each rank
@@ -567,7 +567,6 @@ function playerIsValid(playerName, player)
 		) then
 		return false
 	end
-
 	local lastPlayer = HonorSpy.db.factionrealm.lastStandings[playerName];
 	if (lastPlayer ~= nil) then
 		if(lastPlayer.lastWeekHonor == player.lastWeekHonor and lastPlayer.standing == player.standing) then
@@ -715,12 +714,19 @@ function HonorSpy:TestNextFakePlayer()
 end
 
 -- RESET WEEK
-function HonorSpy:Purge()
+function HonorSpy:Purge(isClick)
 	inspectedPlayers = {};
-	HonorSpy.db.factionrealm.lastStandings=HonorSpy.db.factionrealm.currentStandings;
+
+	if (isClick == true) then
+		HonorSpy.db.factionrealm.lastStandings={};
+		HonorSpy.db.factionrealm.lastPlayerNumber=0;
+	else
+		HonorSpy.db.factionrealm.lastStandings=HonorSpy.db.factionrealm.currentStandings;
+		HonorSpy.db.factionrealm.lastPlayerNumber=HonorSpy.db.factionrealm.currentPlayerNumber;
+	end
+
 	HonorSpy.db.factionrealm.currentStandings={};
 	HonorSpy.db.factionrealm.fakePlayers={};
-	HonorSpy.db.factionrealm.lastPlayerNumber=HonorSpy.db.factionrealm.currentPlayerNumber;
 	HonorSpy.db.factionrealm.currentPlayerNumber = 0;
 	HonorSpy.db.char.original_honor = 0;
 	HonorSpyGUI:Reset();
@@ -762,9 +768,9 @@ function getResetTime()
 	return must_reset_on
 end
 
-function HonorSpy:ResetWeek()
+function HonorSpy:ResetWeek(isClick)
 	HonorSpy.db.factionrealm.last_reset = getResetTime();
-	HonorSpy:Purge()
+	HonorSpy:Purge(isClick)
 	HonorSpy:Print(L["Weekly data was reset"]);
 end
 

@@ -46,7 +46,7 @@ options.args["purge_data"] = {
 	desc = L["Delete all collected data"],
 	confirm = true,
 	confirmText = L["Delete all collected data"] .. '?',
-	func = function() HonorSpy:ResetWeek() end,
+	func = function() HonorSpy:ResetWeek(true) end,
 }
 
 LibStub("AceConfig-3.0"):RegisterOptionsTable("HonorSpy-options", options)
