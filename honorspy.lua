@@ -871,8 +871,8 @@ function DBHealthCheck()
 		end
 	end
 
-	RemoveCorruptData(HonorSpy.db.factionrealm.lastStandings);
-	RemoveCorruptData(HonorSpy.db.factionrealm.currentStandings);
+	-- RemoveCorruptData(HonorSpy.db.factionrealm.lastStandings);
+	-- RemoveCorruptData(HonorSpy.db.factionrealm.currentStandings);
 
 	if (HonorSpy.db.factionrealm.actualCommPrefix ~= commPrefix) then
 		HonorSpy:Purge()
