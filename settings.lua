@@ -48,6 +48,15 @@ options.args["purge_data"] = {
 	confirmText = L["Delete all collected data"] .. '?',
 	func = function() HonorSpy:ResetWeek(true) end,
 }
+options.args["remove_corrupt"] = {
+	order = 6,
+	type = "execute",
+	name = L["Remove corrupt data"],
+	desc = L["Remove all corrupt data"],
+	confirm = true,
+	confirmText = L["Remove all corrupt data"] .. '?',
+	func = function() HonorSpy:RemoveCorrupt() end,
+}
 
 LibStub("AceConfig-3.0"):RegisterOptionsTable("HonorSpy-options", options)
 LibStub("AceConfigDialog-3.0"):AddToBlizOptions("HonorSpy-options", "HonorSpy")

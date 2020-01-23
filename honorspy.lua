@@ -111,7 +111,7 @@ function HonorSpy:INSPECT_HONOR_UPDATE()
 	player.last_checked = GetServerTime();
 	player.RP = 0;
 
-	if (todayHK >= 25 or thisweekHK >= 25) then
+	if (todayHK >= 15 or thisweekHK >= 15) then
 		if (player.rank >= 3) then
 			player.RP = math.ceil((player.rank-2) * 5000 + player.rankProgress * 5000)
 		elseif (player.rank == 2) then
@@ -796,6 +796,29 @@ function HonorSpy:CheckNeedReset(skipUpdate)
 	end
 end
 
+function HonorSpy:RemoveCorrupt()
+	local lastStandings = { }
+	local currentStandings = { }
+
+	for playerName, player in pairs(HonorSpy.db.factionrealm.lastStandings) do
+		table.insert(lastStandings, {playerName, player.lastWeekHonor or 0, player.standing or 0});
+	end
+	for playerName, player in pairs(HonorSpy.db.factionrealm.currentStandings) do
+		table.insert(currentStandings, {playerName, player.lastWeekHonor or 0, player.standing or 0});
+	end
+
+	-- Sort
+	local sort_func_asc = function(a, b)
+		return a[3] > b[3]
+	end
+
+	table.sort(lastStandings, sort_func_asc)
+	table.sort(currentStandings, sort_func_asc)
+
+	RemoveCorruptData(lastStandings, HonorSpy.db.factionrealm.lastStandings);
+	RemoveCorruptData(currentStandings, HonorSpy.db.factionrealm.currentStandings);
+end
+
 -- Minimap icon
 function DrawMinimapIcon()
 	LibStub("LibDBIcon-1.0"):Register("HonorSpy", LibStub("LibDataBroker-1.1"):NewDataObject("HonorSpy",
@@ -826,41 +849,41 @@ end
 function PrintWelcomeMsg()
 	local realm = GetRealmName()
 	local faction = UnitFactionGroup("player")
-	local msg = format("|cffAAAAAAversion: %s, bugs & features: github.com/kakysha/honorspy|r\n|cff209f9b", GetAddOnMetadata(addonName, "Version"))
+	local msg = format("|cffAAAAAAversion: %s, bugs & features: github.com/kakysha/honorspy|r\n", GetAddOnMetadata(addonName, "Version"))
 	if (realm == "Earthshaker" and faction == "Horde") then
 		msg = msg .. format("You are lucky enough to play with HonorSpy author on one |cffFFFFFF%s |cff209f9brealm! Feel free to mail me (|cff8787edKakysha|cff209f9b) a supportive %s  tip or kind word!", realm, GetCoinTextureString(50000))
 	end
-	msg = msg .. "欢迎使用 |cff8787edBinkcn|cff209f9b 修改版本，该版本针对国服优化，并且可以在仅具备较少本地数据的情况下计算出更准确的下周军衔。"
+	msg = msg .. "欢迎使用 |cff8787edBinkcn|cffFFFFFF 修改版本，该版本针对国服优化，并且可以在仅具备较少本地数据的情况下计算出更准确的下周军衔。"
 	msg = msg .. "此版本Bug反馈及功能建议请移步：\nhttps://github.com/Binkcn/HonorSpy"
 	HonorSpy:Print(msg .. "|r")
 end
 
-function RemoveCorruptData(tableStandings)
-	local t = { }
-	for playerName, player in pairs(tableStandings) do
-		table.insert(t, {playerName, player.lastWeekHonor or 0, player.standing or 0});
-	end
-
-	-- Sort
-	local sort_func_asc = function(a, b)
-		return a[2] < b[2]
-	end
-
-	table.sort(t, sort_func_asc)
-
+function RemoveCorruptData(tableData, tableStandings)
 	local prevRow = nil;
-	for i = 1, #t do
-		if (t[i][2] > 0) then
-			if (prevRow ~= nil and t[i][3] > prevRow[3]) then
-				tableStandings[prevRow[1]] = nil;
+	local playerName = nil;
 
-				RemoveCorruptData(tableStandings);
-				break;
+	for i = 1, #tableData do
+		if (tableData[i][2] > 0) then
+			if (prevRow ~= nil and tableData[i][2] < prevRow[2]) then
+				playerName = tableData[i][1]
+
+				table.remove(tableData, i);
+
+				tableStandings[playerName] = nil
+
+				HonorSpy.db.factionrealm.fakePlayers[playerName] = true
+
+				HonorSpy:Print(format("%s：|cff8787ed%s|cffFFFFFF, %s：%s, %s：%s", L["Remove corrupt data"], playerName, L["LstWkHonor"], tableData[i][2], L["Standing"], tableData[i][3] ))
+
+				RemoveCorruptData(tableData, tableStandings)
+				break
 			end
 
-			prevRow = t[i];
+			prevRow = tableData[i];
 		end
 	end
+
+	return tableData
 end
 
 function DBHealthCheck()
@@ -870,9 +893,6 @@ function DBHealthCheck()
 			HonorSpy:Print("removed bad table row", playerName)
 		end
 	end
-
-	-- RemoveCorruptData(HonorSpy.db.factionrealm.lastStandings);
-	-- RemoveCorruptData(HonorSpy.db.factionrealm.currentStandings);
 
 	if (HonorSpy.db.factionrealm.actualCommPrefix ~= commPrefix) then
 		HonorSpy:Purge()
