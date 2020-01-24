@@ -831,6 +831,8 @@ function HonorSpy:RemoveCorrupt()
 
 	RemoveCorruptData(lastStandings, HonorSpy.db.factionrealm.lastStandings);
 	RemoveCorruptData(currentStandings, HonorSpy.db.factionrealm.currentStandings);
+
+	HonorSpy:Print(L["Remove all corrupt data"])
 end
 
 -- Minimap icon
