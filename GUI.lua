@@ -6,7 +6,7 @@ local L = LibStub("AceLocale-3.0"):GetLocale("HonorSpy", true)
 
 LibStub("AceHook-3.0"):Embed(GUI)
 
-local mainFrame, statusLine, playerStandings, reportBtn, scroll = nil, nil, nil, nil
+local mainFrame, statusLine, playerStandings, reportBtn, clearBtn, scroll = nil, nil, nil, nil, nil
 local rows, brackets = {}, {}
 local show_bracket = false
 
@@ -195,17 +195,29 @@ function GUI:PrepareGUI()
 	mainFrame:AddChild(playerStandingsGrp)
 
 	playerStandings = AceGUI:Create("Label")
-	playerStandings:SetRelativeWidth(0.76)
+	playerStandings:SetRelativeWidth(0.60)
 	playerStandings:SetText('\n\n')
 	playerStandingsGrp:AddChild(playerStandings)
 
+	-- Report Button
 	reportBtn = AceGUI:Create("Button")
-	reportBtn:SetRelativeWidth(0.22)
+	reportBtn:SetRelativeWidth(0.18)
 	reportBtn.text:SetFontObject("SystemFont_NamePlate")
 	reportBtn:SetCallback("OnClick", function()
 		HonorSpy:Report(UnitIsPlayer("target") and UnitName("target") or nil)
 	end)
 	playerStandingsGrp:AddChild(reportBtn)
+
+	-- Clear Button
+	clearBtn = AceGUI:Create("Button")
+	clearBtn:SetRelativeWidth(0.18)
+	clearBtn.text:SetFontObject("SystemFont_NamePlate")
+	clearBtn:SetText(L['Remove corrupt data'])
+	clearBtn:SetCallback("OnClick", function()
+		HonorSpy:RemoveCorrupt()
+	end)
+	playerStandingsGrp:AddChild(clearBtn)
+	
 
 	-- TABLE HEADER
 	local tableHeader = AceGUI:Create("SimpleGroup")
