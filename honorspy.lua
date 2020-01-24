@@ -22,6 +22,7 @@ function HonorSpy:OnInitialize()
 			minimapButton = {hide = false},
 			actualCommPrefix = "",
 			fakePlayers = {},
+			corruptPlayers = {},
 			goodPlayers = {}
 		},
 		char = {
@@ -57,7 +58,7 @@ local function StartInspecting(unitID)
 	local name, realm = UnitName(unitID);
 	local level = UnitLevel(unitID);
 
-	if (paused or level ~= 60 or (realm and realm ~= "")) then
+	if (paused or (realm and realm ~= "")) then
 		return
 	end
 	if (name ~= inspectedPlayerName) then -- changed target, clear currently inspected player
@@ -590,7 +591,18 @@ end
 
 function store_player(playerName, player)
 	if (player == nil or playerName == nil or playerName:find("[%d%p%s%c%z]") or isFakePlayer(playerName) or not playerIsValid(playerName, player)) then return end
+
 	local player = table.copy(player);
+
+	local corruptPlayerCheck = HonorSpy.db.factionrealm.corruptPlayers[playerName];
+	if (corruptPlayerCheck ~= nil) then
+		if (corruptPlayerCheck >= player.last_checked) then
+			return
+		else
+			HonorSpy.db.factionrealm.corruptPlayers[playerName] = nil;
+		end
+	end
+
 	local localPlayer = HonorSpy.db.factionrealm.currentStandings[playerName];
 	if (localPlayer == nil or localPlayer.last_checked < player.last_checked) then
 		HonorSpy.db.factionrealm.currentStandings[playerName] = player;
@@ -600,6 +612,7 @@ function store_player(playerName, player)
 			HonorSpy.db.factionrealm.currentPlayerNumber = player.standing;
 		end
 	end
+
 end
 
 function HonorSpy:OnCommReceive(prefix, message, distribution, sender)
@@ -727,6 +740,7 @@ function HonorSpy:Purge(isClick)
 
 	HonorSpy.db.factionrealm.currentStandings={};
 	HonorSpy.db.factionrealm.fakePlayers={};
+	HonorSpy.db.factionrealm.corruptPlayers={};
 	HonorSpy.db.factionrealm.currentPlayerNumber = 0;
 	HonorSpy.db.char.original_honor = 0;
 	HonorSpyGUI:Reset();
@@ -859,40 +873,70 @@ function PrintWelcomeMsg()
 end
 
 function RemoveCorruptData(tableData, tableStandings)
-	local prevRow = nil;
 	local playerName = nil;
+	local playerHonor = nil;
 
-	for i = 1, #tableData do
-		if (tableData[i][2] > 0) then
-			if (prevRow ~= nil and tableData[i][2] < prevRow[2]) then
-				playerName = tableData[i][1]
+	-- Check last.
+	if (#tableData >= 2) then
+		if ( tableData[1][2] > tableData[2][2] ) then
+			playerName = tableData[1][1]
+			playerHonor = tableData[1][2]
 
-				table.remove(tableData, i);
+			tableStandings[playerName] = nil
 
+			HonorSpy.db.factionrealm.corruptPlayers[playerName] = GetServerTime();
+
+			HonorSpy:Print(format("%s：|cff8787ed%s|cffFFFFFF, %s：%s, %s：%s", L["Remove corrupt data"], playerName, L["LstWkHonor"], playerHonor, L["Standing"], tableData[i][3] ))
+
+			table.remove(tableData, 1);
+
+			RemoveCorruptData(tableData, tableStandings)
+			return
+		end
+	end
+
+	-- Check everone.
+	for i = 2, (#tableData-1) do
+		playerName = tableData[i][1]
+		playerHonor = tableData[i][2]
+
+		if (playerHonor > 0) then
+			if ( playerHonor < tableData[i-1][2] and  playerHonor < tableData[i+1][2]) then
 				tableStandings[playerName] = nil
 
-				HonorSpy.db.factionrealm.fakePlayers[playerName] = true
+				HonorSpy.db.factionrealm.corruptPlayers[playerName] = GetServerTime();
 
-				HonorSpy:Print(format("%s：|cff8787ed%s|cffFFFFFF, %s：%s, %s：%s", L["Remove corrupt data"], playerName, L["LstWkHonor"], tableData[i][2], L["Standing"], tableData[i][3] ))
+				HonorSpy:Print(format("%s：|cff8787ed%s|cffFFFFFF, %s：%s, %s：%s", L["Remove corrupt data"], playerName, L["LstWkHonor"], playerHonor, L["Standing"], tableData[i][3] ))
+
+				table.remove(tableData, i);
 
 				RemoveCorruptData(tableData, tableStandings)
 				break
 			end
 
-			prevRow = tableData[i];
 		end
 	end
+
+	-- Check first
+	-- TODO
 
 	return tableData
 end
 
 function DBHealthCheck()
+	local currentPlayerNumber = 0
 	for playerName, player in pairs(HonorSpy.db.factionrealm.currentStandings) do
 		if (not playerIsValid(playerName, player)) then
 			HonorSpy.db.factionrealm.currentStandings[playerName] = nil
 			HonorSpy:Print("removed bad table row", playerName)
+		else
+			if (player.standing > currentPlayerNumber) then
+				currentPlayerNumber = player.standing;
+			end
 		end
 	end
+
+	HonorSpy.db.factionrealm.currentPlayerNumber = currentPlayerNumber;
 
 	if (HonorSpy.db.factionrealm.actualCommPrefix ~= commPrefix) then
 		HonorSpy:Purge()
