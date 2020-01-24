@@ -16,7 +16,6 @@ function HonorSpy:OnInitialize()
 		factionrealm = {
 			currentPlayerNumber = 0,
 			currentStandings = {},
-			lastPlayerNumber = 0,
 			lastStandings = {},
 			last_reset = 0,
 			minimapButton = {hide = false},
@@ -290,40 +289,12 @@ end
 
 -- REPORT
 function HonorSpy:GetPoolSize(pool_size)
-
 	local currentPlayerNumber = HonorSpy.db.factionrealm.currentPlayerNumber;
-	local lastPlayerNumber = HonorSpy.db.factionrealm.lastPlayerNumber;
 
 	if (currentPlayerNumber and type(currentPlayerNumber) == "number" and currentPlayerNumber > pool_size) then
 		pool_size = currentPlayerNumber;
 	end
 	
-	-- Compatible with old data
-	if (lastPlayerNumber and type(lastPlayerNumber) == "number" and lastPlayerNumber == 0) then
-		local t = { };
-
-		for playerName, player in pairs(HonorSpy.db.factionrealm.lastStandings) do
-			table.insert(t, {playerName, player.lastWeekHonor or 0, player.standing or 0});
-		end
-
-		-- Sort
-		local sort_func_desc = function(a, b)
-			return a[3] > b[3];
-		end
-
-		table.sort(t, sort_func_desc);
-
-		if (#t >= 1) then
-			lastPlayerNumber = t[1][3];
-		end
-
-		HonorSpy.db.factionrealm.lastPlayerNumber = lastPlayerNumber;
-	end
-
-	if (lastPlayerNumber and type(lastPlayerNumber) == "number" and lastPlayerNumber > pool_size) then
-		pool_size = lastPlayerNumber;
-	end
-
 	return pool_size;
 end
 
@@ -732,10 +703,8 @@ function HonorSpy:Purge(isClick)
 
 	if (isClick == true) then
 		HonorSpy.db.factionrealm.lastStandings={};
-		HonorSpy.db.factionrealm.lastPlayerNumber=0;
 	else
 		HonorSpy.db.factionrealm.lastStandings=HonorSpy.db.factionrealm.currentStandings;
-		HonorSpy.db.factionrealm.lastPlayerNumber=HonorSpy.db.factionrealm.currentPlayerNumber;
 	end
 
 	HonorSpy.db.factionrealm.currentStandings={};
