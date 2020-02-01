@@ -780,6 +780,7 @@ function HonorSpy:CheckNeedReset(skipUpdate)
 end
 
 function HonorSpy:RemoveCorrupt()
+	local minDataLength = 500
 	local lastStandings = { }
 	local currentStandings = { }
 
@@ -799,16 +800,25 @@ function HonorSpy:RemoveCorrupt()
 		return a[3] > b[3]
 	end
 
-	table.sort(lastStandings, sort_func_asc)
-	table.sort(currentStandings, sort_func_asc)
+	if (#lastStandings >= minDataLength) then
+		table.sort(lastStandings, sort_func_asc)
 
-	RemoveRepeatData(lastStandings, HonorSpy.db.factionrealm.lastStandings);
-	RemoveRepeatData(currentStandings, HonorSpy.db.factionrealm.currentStandings);
+		RemoveRepeatData(lastStandings, HonorSpy.db.factionrealm.lastStandings);
+		RemoveCorruptData(lastStandings, HonorSpy.db.factionrealm.lastStandings);
+		RemoveBottomData(lastStandings, HonorSpy.db.factionrealm.lastStandings);
+	end
 
-	RemoveCorruptData(lastStandings, HonorSpy.db.factionrealm.lastStandings);
-	RemoveCorruptData(currentStandings, HonorSpy.db.factionrealm.currentStandings);
+	if (#currentStandings < minDataLength) then
+		HonorSpy:Print(L["Requires more than 500 data table records"])
+	else
+		table.sort(currentStandings, sort_func_asc)
 
-	HonorSpy:Print(L["Remove all corrupt data"])
+		RemoveRepeatData(currentStandings, HonorSpy.db.factionrealm.currentStandings);
+		RemoveCorruptData(currentStandings, HonorSpy.db.factionrealm.currentStandings);
+		RemoveBottomData(currentStandings, HonorSpy.db.factionrealm.currentStandings);
+
+		HonorSpy:Print(L["Remove all corrupt data"])
+	end
 end
 
 -- Minimap icon
@@ -850,13 +860,16 @@ function PrintWelcomeMsg()
 	HonorSpy:Print(msg .. "|r")
 end
 
-
 function RemoveRepeatData(tableData, tableStandings)
-	local playerName = nil;
-	local playerHonor = nil;
-	local playerStanding = nil;
+	local _playerName = nil;
+	local _playerHonor = nil;
+	local _playerStanding = nil;
 
 	local repeatHonor, repearStanding = nil, nil
+
+	if (#tableData <= 100) then
+		return
+	end
 
 	for i=#tableData, 2, -1 do
 		if ( tableData[i][2] == tableData[i-1][2] and tableData[i][3] == tableData[i-1][3] ) then
@@ -866,50 +879,53 @@ function RemoveRepeatData(tableData, tableStandings)
 			-- remove repeat data.
 			local j = i 
 			while (tableData[j][2] == repeatHonor and tableData[j][3] == repearStanding) do
-				playerName = tableData[j][1]
-				playerHonor = tableData[j][2]
-				playerStanding = tableData[j][3]
+				_playerName = tableData[j][1]
+				_playerHonor = tableData[j][2]
+				_playerStanding = tableData[j][3]
 
-				tableStandings[playerName] = nil
+				tableStandings[_playerName] = nil
 
-				HonorSpy.db.factionrealm.corruptPlayers[playerName] = GetServerTime();
+				HonorSpy.db.factionrealm.corruptPlayers[_playerName] = GetServerTime();
 
-				HonorSpy:Print(format("%s：|cffAAAAAA%s|cffFFFFFF, %s：%s, %s：%s", L["Remove repeat data"], playerName, L["LstWkHonor"], playerHonor, L["Standing"], playerStanding ))
+				HonorSpy:Print(format("%s：|cffAAAAAA%s|cffFFFFFF, %s：%s, %s：%s", L["Remove repeat data"], _playerName, L["LstWkHonor"], _playerHonor, L["Standing"], _playerStanding ))
 
 				table.remove(tableData, j);
 
 				-- move next
-				j = j-1
+				if (j >= 2) then
+					j = j-1
+				end
 			end
 
 			-- reset array index
 			i = j
 		end
 	end
-
-	return tableData
 end
 
-
 function RemoveCorruptData(tableData, tableStandings)
-	local playerName = nil;
-	local playerHonor = nil;
-	local playerStanding = nil;
+	local _playerName = nil;
+	local _playerHonor = nil;
+	local _playerStanding = nil;
+
+	if (#tableData <= 100) then
+		return
+	end
 
 	for i=(#tableData-1), 10, -1 do
-		playerName = tableData[i][1]
-		playerHonor = tableData[i][2]
-		playerStanding = tableData[i][3]
+		_playerName = tableData[i][1]
+		_playerHonor = tableData[i][2]
+		_playerStanding = tableData[i][3]
 
 		if (tableData[i+1][2] >= tableData[i-1][2]) then
-			if (playerHonor >= tableData[i-1][2] and playerHonor <= tableData[i+1][2]) then
+			if (_playerHonor >= tableData[i-1][2] and _playerHonor <= tableData[i+1][2]) then
 				-- pass
 			else
-				tableStandings[playerName] = nil
+				tableStandings[_playerName] = nil
 
-				HonorSpy.db.factionrealm.corruptPlayers[playerName] = GetServerTime();
+				HonorSpy.db.factionrealm.corruptPlayers[_playerName] = GetServerTime();
 
-				HonorSpy:Print(format("%s：|cffAAAAAA%s|cffFFFFFF, %s：%s, %s：%s", L["Remove corrupt data"], playerName, L["LstWkHonor"], playerHonor, L["Standing"], playerStanding ))
+				HonorSpy:Print(format("%s：|cffAAAAAA%s|cffFFFFFF, %s：%s, %s：%s", L["Remove corrupt data"], _playerName, L["LstWkHonor"], _playerHonor, L["Standing"], _playerStanding ))
 
 				table.remove(tableData, i);
 
@@ -918,8 +934,43 @@ function RemoveCorruptData(tableData, tableStandings)
 			end
 		end
 	end
+end
 
-	return tableData
+function RemoveBottomData(tableData, tableStandings)
+	local _playerName = nil;
+	local _playerHonor = nil;
+	local _playerStanding = nil;
+
+	local minHonorThreshold = 100
+	local minHonorValue = 100
+	local checkData = false
+
+	if (#tableData <= 100) then
+		return
+	end
+
+	for i=100, 1, -1 do
+		_playerName = tableData[i][1]
+		_playerHonor = tableData[i][2]
+		_playerStanding = tableData[i][3]
+
+		if (checkData == false and _playerHonor <= minHonorThreshold) then
+			checkData = true
+		end
+
+		if (checkData == true) then
+			minHonorValue = math.min(minHonorValue, _playerHonor)
+			if (_playerHonor > minHonorValue) then
+				tableStandings[_playerName] = nil
+
+				HonorSpy.db.factionrealm.corruptPlayers[_playerName] = GetServerTime();
+
+				HonorSpy:Print(format("%s：|cffAAAAAA%s|cffFFFFFF, %s：%s, %s：%s", L["Remove corrupt data"], _playerName, L["LstWkHonor"], _playerHonor, L["Standing"], _playerStanding ))
+
+				table.remove(tableData, i);
+			end
+		end
+	end
 end
 
 function DBHealthCheck()
