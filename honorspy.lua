@@ -943,6 +943,7 @@ function RemoveBottomData(tableData, tableStandings)
 
 	local minHonorThreshold = 100
 	local minHonorValue = 100
+	local maxStandingValue = 0
 	local checkData = false
 
 	if (#tableData <= 100) then
@@ -960,6 +961,7 @@ function RemoveBottomData(tableData, tableStandings)
 
 		if (checkData == true) then
 			minHonorValue = math.min(minHonorValue, _playerHonor)
+
 			if (_playerHonor > minHonorValue) then
 				tableStandings[_playerName] = nil
 
@@ -968,9 +970,13 @@ function RemoveBottomData(tableData, tableStandings)
 				HonorSpy:Print(format("%s：|cffAAAAAA%s|cffFFFFFF, %s：%s, %s：%s", L["Remove corrupt data"], _playerName, L["LstWkHonor"], _playerHonor, L["Standing"], _playerStanding ))
 
 				table.remove(tableData, i);
+			else
+				maxStandingValue = math.max(maxStandingValue, _playerStanding)
 			end
 		end
 	end
+
+	HonorSpy.db.factionrealm.currentPlayerNumber = maxStandingValue;
 end
 
 function DBHealthCheck()
