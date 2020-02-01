@@ -784,10 +784,14 @@ function HonorSpy:RemoveCorrupt()
 	local currentStandings = { }
 
 	for playerName, player in pairs(HonorSpy.db.factionrealm.lastStandings) do
-		table.insert(lastStandings, {playerName, player.lastWeekHonor or 0, player.standing or 0});
+		if (player.standing > 0 and player.lastWeekHonor > 0) then
+			table.insert(lastStandings, {playerName, player.lastWeekHonor or 0, player.standing or 0});
+		end
 	end
 	for playerName, player in pairs(HonorSpy.db.factionrealm.currentStandings) do
-		table.insert(currentStandings, {playerName, player.lastWeekHonor or 0, player.standing or 0});
+		if (player.standing > 0 and player.lastWeekHonor > 0) then
+			table.insert(currentStandings, {playerName, player.lastWeekHonor or 0, player.standing or 0});
+		end
 	end
 
 	-- Sort
@@ -797,6 +801,9 @@ function HonorSpy:RemoveCorrupt()
 
 	table.sort(lastStandings, sort_func_asc)
 	table.sort(currentStandings, sort_func_asc)
+
+	RemoveRepeatData(lastStandings, HonorSpy.db.factionrealm.lastStandings);
+	RemoveRepeatData(currentStandings, HonorSpy.db.factionrealm.currentStandings);
 
 	RemoveCorruptData(lastStandings, HonorSpy.db.factionrealm.lastStandings);
 	RemoveCorruptData(currentStandings, HonorSpy.db.factionrealm.currentStandings);
@@ -843,53 +850,74 @@ function PrintWelcomeMsg()
 	HonorSpy:Print(msg .. "|r")
 end
 
-function RemoveCorruptData(tableData, tableStandings)
+
+function RemoveRepeatData(tableData, tableStandings)
 	local playerName = nil;
 	local playerHonor = nil;
+	local playerStanding = nil;
 
-	-- Check last.
-	if (#tableData >= 2) then
-		if ( tableData[1][2] > tableData[2][2] ) then
-			playerName = tableData[1][1]
-			playerHonor = tableData[1][2]
+	local repeatHonor, repearStanding = nil, nil
 
-			tableStandings[playerName] = nil
+	for i=#tableData, 2, -1 do
+		if ( tableData[i][2] == tableData[i-1][2] and tableData[i][3] == tableData[i-1][3] ) then
+			repeatHonor = tableData[i][2]
+			repearStanding = tableData[i][3]
 
-			HonorSpy.db.factionrealm.corruptPlayers[playerName] = GetServerTime();
+			-- remove repeat data.
+			local j = i 
+			while (tableData[j][2] == repeatHonor and tableData[j][3] == repearStanding) do
+				playerName = tableData[j][1]
+				playerHonor = tableData[j][2]
+				playerStanding = tableData[j][3]
 
-			HonorSpy:Print(format("%s：|cff8787ed%s|cffFFFFFF, %s：%s, %s：%s", L["Remove corrupt data"], playerName, L["LstWkHonor"], playerHonor, L["Standing"], tableData[i][3] ))
-
-			table.remove(tableData, 1);
-
-			RemoveCorruptData(tableData, tableStandings)
-			return
-		end
-	end
-
-	-- Check everone.
-	for i = 2, (#tableData-1) do
-		playerName = tableData[i][1]
-		playerHonor = tableData[i][2]
-
-		if (playerHonor > 0) then
-			if ( playerHonor < tableData[i-1][2] and  playerHonor < tableData[i+1][2]) then
 				tableStandings[playerName] = nil
 
 				HonorSpy.db.factionrealm.corruptPlayers[playerName] = GetServerTime();
 
-				HonorSpy:Print(format("%s：|cff8787ed%s|cffFFFFFF, %s：%s, %s：%s", L["Remove corrupt data"], playerName, L["LstWkHonor"], playerHonor, L["Standing"], tableData[i][3] ))
+				HonorSpy:Print(format("%s：|cffAAAAAA%s|cffFFFFFF, %s：%s, %s：%s", L["Remove repeat data"], playerName, L["LstWkHonor"], playerHonor, L["Standing"], playerStanding ))
+
+				table.remove(tableData, j);
+
+				-- move next
+				j = j-1
+			end
+
+			-- reset array index
+			i = j
+		end
+	end
+
+	return tableData
+end
+
+
+function RemoveCorruptData(tableData, tableStandings)
+	local playerName = nil;
+	local playerHonor = nil;
+	local playerStanding = nil;
+
+	for i=(#tableData-1), 10, -1 do
+		playerName = tableData[i][1]
+		playerHonor = tableData[i][2]
+		playerStanding = tableData[i][3]
+
+		if (tableData[i+1][2] >= tableData[i-1][2]) then
+			if (playerHonor >= tableData[i-1][2] and playerHonor <= tableData[i+1][2]) then
+				-- pass
+			else
+				tableStandings[playerName] = nil
+
+				HonorSpy.db.factionrealm.corruptPlayers[playerName] = GetServerTime();
+
+				HonorSpy:Print(format("%s：|cffAAAAAA%s|cffFFFFFF, %s：%s, %s：%s", L["Remove corrupt data"], playerName, L["LstWkHonor"], playerHonor, L["Standing"], playerStanding ))
 
 				table.remove(tableData, i);
 
 				RemoveCorruptData(tableData, tableStandings)
 				break
 			end
-
 		end
 	end
-
-	-- Check first
-	-- TODO
 
 	return tableData
 end
