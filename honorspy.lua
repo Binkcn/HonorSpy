@@ -22,7 +22,12 @@ function HonorSpy:OnInitialize()
 			actualCommPrefix = "",
 			fakePlayers = {},
 			corruptPlayers = {},
-			goodPlayers = {}
+			goodPlayers = {},
+			custom = {
+				enable = false,
+				standing = 0,
+				player_number = 0
+			}
 		},
 		char = {
 			today_kills = {},
@@ -287,12 +292,41 @@ function HonorSpy:BuildStandingsTable(sort_by)
 	return t
 end
 
+-- CUSTOM
+function HonorSpy:CustomSet(standingValue, totalPlayerValue)
+	if (   tonumber(standingValue) == nil
+		or tonumber(totalPlayerValue) == nil
+		or tonumber(standingValue) <= 0
+		or tonumber(totalPlayerValue) <= 0
+		or tonumber(standingValue) > tonumber(totalPlayerValue)
+		) then
+
+		HonorSpy:Print(colorize(L['Must be an integer greater than zero'], "ORANGE"))
+		return
+	end
+
+	HonorSpy.db.factionrealm.custom.enable = true;
+	HonorSpy.db.factionrealm.custom.standing = tonumber(standingValue);
+	HonorSpy.db.factionrealm.custom.player_number = tonumber(totalPlayerValue);
+end
+
+function HonorSpy:CustomReset()
+	HonorSpy.db.factionrealm.custom.enable = false;
+	HonorSpy.db.factionrealm.custom.standing = 0;
+	HonorSpy.db.factionrealm.custom.player_number = 0;
+end
+
+
 -- REPORT
 function HonorSpy:GetPoolSize(pool_size)
-	local currentPlayerNumber = HonorSpy.db.factionrealm.currentPlayerNumber;
+	if (HonorSpy.db.factionrealm.custom.enable == true) then
+		pool_size = HonorSpy.db.factionrealm.custom.player_number
+	else
+		local currentPlayerNumber = HonorSpy.db.factionrealm.currentPlayerNumber;
 
-	if (currentPlayerNumber and type(currentPlayerNumber) == "number" and currentPlayerNumber > pool_size) then
-		pool_size = currentPlayerNumber;
+		if (currentPlayerNumber and type(currentPlayerNumber) == "number" and currentPlayerNumber > pool_size) then
+			pool_size = currentPlayerNumber;
+		end
 	end
 	
 	return pool_size;
@@ -411,7 +445,9 @@ function HonorSpy:EstimateQuery(queryType, queryValue)
 end
 
 function HonorSpy:Estimate(playerOfInterest)
+	local isPlayer = false
 	if (not playerOfInterest) then
+		isPlayer = true
 		playerOfInterest = playerName
 	end
 	playerOfInterest = string.utf8upper(string.utf8sub(playerOfInterest, 1, 1))..string.utf8lower(string.utf8sub(playerOfInterest, 2))
@@ -432,18 +468,22 @@ function HonorSpy:Estimate(playerOfInterest)
 		return
 	end;
 
-	local thisWeekHonor = HonorSpy.db.factionrealm.currentStandings[playerOfInterest].thisWeekHonor;
-
-	-- Add today honor
-	if (playerOfInterest == UnitName("player")) then
-		thisWeekHonor = HonorSpy.db.char.estimated_honor;
-	end
-
-	local estStanding = HonorSpy:EstimateQuery('Honor', thisWeekHonor);
-	if (estStanding == false) then
-		standing = index;
+	if (isPlayer == true and HonorSpy.db.factionrealm.custom.enable == true) then
+		standing = HonorSpy.db.factionrealm.custom.standing
 	else
-		standing = estStanding;
+		local thisWeekHonor = HonorSpy.db.factionrealm.currentStandings[playerOfInterest].thisWeekHonor;
+
+		-- Add today honor
+		if (playerOfInterest == UnitName("player")) then
+			thisWeekHonor = HonorSpy.db.char.estimated_honor;
+		end
+
+		local estStanding = HonorSpy:EstimateQuery('Honor', thisWeekHonor);
+		if (estStanding == false) then
+			standing = index;
+		else
+			standing = estStanding;
+		end
 	end
 
 	local RP  = {0, 400} -- RP for each bracket

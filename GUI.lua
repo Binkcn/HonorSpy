@@ -7,6 +7,7 @@ local L = LibStub("AceLocale-3.0"):GetLocale("HonorSpy", true)
 LibStub("AceHook-3.0"):Embed(GUI)
 
 local mainFrame, statusLine, playerStandings, reportBtn, clearBtn, scroll = nil, nil, nil, nil, nil
+local editFrame, editStanding, editTotalPlayer = nil, nil, nil
 local rows, brackets = {}, {}
 local show_bracket = false
 
@@ -56,14 +57,18 @@ function GUI:Show(skipUpdate, sort_column)
 
 	local pool_size, _, standing, bracket, RP, EstRP, Rank, Progress, EstRank, EstProgress = HonorSpy:Estimate(false)
 	if (index and standing) then
+		editStanding:SetText(standing);
+		editTotalPlayer:SetText(totalPlayerNumber);
+		editFrame:Show();
+
 		local playerText = colorize(L['Progress of'], "GREY") .. ' ' .. colorize(playerName, HonorSpy.db.factionrealm.currentStandings[playerName].class)
 		playerText = playerText .. ', ' .. colorize(L['Estimated Honor'] .. ': ', "GREY") .. colorize(HonorSpy.db.char.estimated_honor, "ORANGE")
-		playerText = playerText .. ', ' .. colorize(L['Estimated Standing'] .. ':', "GREY") .. colorize(standing, "ORANGE")
-		playerText = playerText .. '\n' .. colorize(L['Total Player Number'] .. ':', "GREY") .. colorize(totalPlayerNumber, "ORANGE")
 		playerText = playerText .. ' ' .. colorize(L['Bracket'] .. ':', "GREY") .. colorize(bracket, "ORANGE")
 		playerText = playerText .. ' ' .. colorize(L['Current Rank'] .. ':', "GREY") .. colorize(format('%d (%d%%)', Rank, Progress), "ORANGE")
 		playerText = playerText .. ' ' .. colorize(L['Next Week Rank'] .. ':', "GREY") .. colorize(format('%d (%d%%)', EstRank, EstProgress), EstRP >= RP and "GREEN" or "RED")
-		playerStandings:SetText(playerText .. '\n')
+		playerText = playerText .. '\n' .. colorize(L['Estimated Standing'] .. ':', "GREY")
+		playerText = playerText .. '\n' .. colorize(L['Total Player Number'] .. ':', "GREY")
+		playerStandings:SetText(playerText)
 
 		scroll.scrollBar:SetValue(index * scroll.buttonHeight-200)
 		scroll.scrollBar.thumbTexture:Show()
@@ -195,9 +200,90 @@ function GUI:PrepareGUI()
 	mainFrame:AddChild(playerStandingsGrp)
 
 	playerStandings = AceGUI:Create("Label")
-	playerStandings:SetRelativeWidth(0.60)
+	playerStandings:SetRelativeWidth(0.80)
 	playerStandings:SetText('\n\n')
 	playerStandingsGrp:AddChild(playerStandings)
+
+
+
+
+
+
+	-- Custom input.
+	editFrame = CreateFrame("Frame", nil, playerStandingsGrp.frame);
+	editFrame:SetWidth(100);
+	editFrame:SetPoint("TOPLEFT", 70, -18);
+	editFrame:SetPoint("BOTTOMRIGHT", -650, -4);
+	editFrame:Hide();
+
+
+
+	editStanding = CreateFrame("EditBox", nil, editFrame);
+	editStanding:SetAutoFocus(false);
+	editStanding:SetMaxLetters(6);
+	editStanding:SetHeight(18);
+	editStanding:SetFontObject("GameFontWhite");
+	editStanding:SetJustifyH("LEFT");
+	editStanding:SetJustifyV("CENTER");
+	editStanding:SetTextInsets(7,7,7,7);
+	editStanding:SetBackdrop({
+		bgFile = [[Interface\Buttons\WHITE8x8]],
+		edgeFile = [[Interface\Tooltips\UI-Tooltip-Border]],
+		edgeSize = 16,
+		insets = {left = 1, right = 1, top = 1, bottom = 1},
+	});
+	editStanding:SetBackdropColor(0, 0, 0);
+	editStanding:SetBackdropBorderColor(0.3, 0.3, 0.3);
+
+	editFrame.standingEdit = editStanding;
+	editFrame.standingEdit:SetPoint("TOPLEFT", 0, 0);
+	editFrame.standingEdit:SetPoint("BOTTOMRIGHT", 0, 16);
+
+
+	editTotalPlayer = CreateFrame("EditBox", nil, editFrame);
+	editTotalPlayer:SetAutoFocus(false);
+	editTotalPlayer:SetMaxLetters(6);
+	editTotalPlayer:SetHeight(18);
+	editTotalPlayer:SetFontObject("GameFontWhite");
+	editTotalPlayer:SetJustifyH("LEFT");
+	editTotalPlayer:SetJustifyV("CENTER");
+	editTotalPlayer:SetTextInsets(7,7,7,7);
+	editTotalPlayer:SetBackdrop({
+		bgFile = [[Interface\Buttons\WHITE8x8]],
+		edgeFile = [[Interface\Tooltips\UI-Tooltip-Border]],
+		edgeSize = 16,
+		insets = {left = 1, right = 1, top = 1, bottom = 1},
+	});
+	editTotalPlayer:SetBackdropColor(0, 0, 0);
+	editTotalPlayer:SetBackdropBorderColor(0.3, 0.3, 0.3);
+
+	editFrame.totalPlayerEdit = editTotalPlayer;
+	editFrame.totalPlayerEdit:SetPoint("TOPLEFT", 0, -16);
+	editFrame.totalPlayerEdit:SetPoint("BOTTOMRIGHT", 0, 0);
+
+	editFrame.confirmBtn = CreateFrame("Button", nil, editFrame, "OptionsButtonTemplate");
+	editFrame.confirmBtn:SetText(L['Confirm Edit']);
+	editFrame.confirmBtn:SetPoint("TOPLEFT", 80, -6);
+	editFrame.confirmBtn:SetWidth(125);
+	editFrame.confirmBtn:SetScript("OnClick", function(self)
+		local standingValue = editStanding:GetText()
+		local totalPlayerValue = editTotalPlayer:GetText()
+
+		HonorSpy:CustomSet(standingValue, totalPlayerValue)
+
+		GUI:Show(true, nil)
+	end)
+
+	editFrame.resetBtn = CreateFrame("Button", nil, editFrame, "OptionsButtonTemplate");
+	editFrame.resetBtn:SetText(L['Reset Edit']);
+	editFrame.resetBtn:SetPoint("TOPLEFT", 220, -6);
+	editFrame.resetBtn:SetWidth(125);
+	editFrame.resetBtn:SetScript("OnClick", function(self)
+		HonorSpy:CustomReset()
+
+		GUI:Show(true, nil)
+	end)
+
 
 	-- Report Button
 	reportBtn = AceGUI:Create("Button")
@@ -209,15 +295,19 @@ function GUI:PrepareGUI()
 	playerStandingsGrp:AddChild(reportBtn)
 
 	-- Clear Button
-	clearBtn = AceGUI:Create("Button")
-	clearBtn:SetRelativeWidth(0.18)
-	clearBtn.text:SetFontObject("SystemFont_NamePlate")
-	clearBtn:SetText(L['Remove corrupt data'])
-	clearBtn:SetCallback("OnClick", function()
-		HonorSpy:RemoveCorrupt()
-	end)
-	playerStandingsGrp:AddChild(clearBtn)
+	-- clearBtn = AceGUI:Create("Button")
+	-- clearBtn:SetRelativeWidth(0.18)
+	-- clearBtn.text:SetFontObject("SystemFont_NamePlate")
+	-- clearBtn:SetText(L['Remove corrupt data'])
+	-- clearBtn:SetCallback("OnClick", function()
+	-- 	HonorSpy:RemoveCorrupt()
+	-- end)
+	-- playerStandingsGrp:AddChild(clearBtn)
 	
+
+
+
+
 
 	-- TABLE HEADER
 	local tableHeader = AceGUI:Create("SimpleGroup")
